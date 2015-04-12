@@ -1,0 +1,350 @@
+import pygame
+from pygame.locals import *
+from sys import exit
+from draw import *
+from move import *
+import copy
+
+# the colors we may use in the game
+WHITE = (255, 255, 255)
+GRAY  = (127, 127, 127)
+BLACK = (  0,   0,   0)
+GREEN = (  0, 135,   0)
+
+# board size
+BOARD_SIZE = 8
+
+# three status of tiles 
+EMPTY_TILE  = "EMPTY"
+WHITE_PIECE = "WHITE"
+BLACK_PIECE = "BLACK"
+
+# record the scores of each player
+score = dict()
+score["WHITE"] = 2
+score["BLACK"] = 2
+
+# the computer holds BLACK piece
+OPPONENT = "BLACK"
+
+# Set the fonts
+pygame.font.init()
+FONT_SIZE = 20
+FONT = pygame.font.SysFont("Arial", FONT_SIZE)
+
+# the main process of the game
+def run_game():
+    # create the window
+    global SCREEN
+    pygame.init()
+    SCREEN = pygame.display.set_mode((480, 480))
+
+    # set the title of the window
+    pygame.display.set_caption('Othello')
+
+    # create the board array
+    board = [[EMPTY_TILE] * BOARD_SIZE for i in range(BOARD_SIZE)]
+
+    # reset the board as starting status
+    board_reset(board)
+
+    #TESTING
+    #test_reset(board)
+
+    # display the instructions and let the user choose the mode
+    mode = main_menu()
+
+    # single player mode
+    if mode == "single":
+        SCREEN.fill(BLACK)
+        # let the player choose the difficulty
+        difficulty_determine()
+        # draw the board
+        draw_board(SCREEN, board)
+        # player holds white pieces
+        player = WHITE_PIECE
+        start_move = 1
+        # determine computer moves 
+        vs_computer(board, player, start_move)
+
+    # double player mode
+    elif mode == "double":
+        # draw the board
+        draw_board(SCREEN, board)
+        # player holds white pieces
+        player = WHITE_PIECE
+        # switch the player 
+        vs_player(board, player)
+
+# double player mode
+def vs_player(board, player):
+    while True:
+
+        # determine the player and opposite
+        if player == WHITE_PIECE: opposite = BLACK_PIECE
+        else: opposite = WHITE_PIECE
+               
+        # different game event
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.display.quit()
+                exit()
+            # End if q is pressed
+            elif (event.type == pygame.KEYDOWN and
+                  (event.key == pygame.K_q or event.key == pygame.K_ESCAPE)):
+                pygame.display.quit()
+                exit()
+            # Respond to clicks
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if on_click(event, board, player, opposite, score):
+                    draw_board(SCREEN, board)
+                    player = game_check(board, player, opposite)
+        
+        # update the board
+        pygame.display.update()    
+
+# single player mode
+def vs_computer(board, player, start_move):
+    while True:
+        # determine the player and opposite
+        if player == WHITE_PIECE: opposite = BLACK_PIECE
+        else: opposite = WHITE_PIECE
+
+        # determine the computer's move
+        if player == OPPONENT:
+            # if the current player can make a move
+            if len(get_valid_spot(board, player)):
+                # if the difficulty is not easy, use minimax with corresponding FUTURE_MOVES to make moves 
+                if FUTURE_MOVES > 1:
+                    best_move = minimax_get_move(board, player, opposite, start_move, FUTURE_MOVES, score)["Move"]
+                # if the difficulty is easy, use greedy to make moves
+                else:
+                    best_move = greedy_get_move(board, player, opposite, FUTURE_MOVES, score)
+
+            # if the current player cannot make a move, switch the player
+            else:
+                # empty the best_move 
+                best_move = ()
+                player = game_check(board, player, opposite)
+                if player != OPPONENT:
+                    opposite = OPPONENT
+
+            # when there is a best_move
+            if len(best_move):
+                # make move at the best_move
+                make_move(board, player, opposite, best_move[0], best_move[1], score)
+                # draw the boaard
+                draw_board(SCREEN, board)
+                # determine the player
+                player = game_check(board, player, opposite)
+                # switch the player
+                if player != OPPONENT:
+                    opposite = OPPONENT
+                
+        # different event in game
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.display.quit()
+                exit()
+            # End if q is pressed
+            elif (event.type == pygame.KEYDOWN and
+                  (event.key == pygame.K_q or event.key == pygame.K_ESCAPE)):
+                pygame.display.quit()
+                exit()
+            # Respond to clicks
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if on_click(event, board, player, opposite, score):
+                    draw_board(SCREEN, board)
+                    player = game_check(board, player, opposite)
+        
+        pygame.display.update()    
+
+# determine player of the next turn 
+def game_check(board, player, opposite):
+
+    # if no one can make a move, find the winner and end the game
+    if len(get_valid_spot(board, opposite)) == 0:
+        if len(get_valid_spot(board, player)) == 0:
+            # Find out who won
+            get_winner(board)
+
+        # if only one cannot make a move, skip it and turn back to player
+        else:
+            # tell user there are no moves 
+            # Determine the message
+            display_text(SCREEN, "  {} CANNOT MAKE A MOVE  ".format(opposite))
+            pygame.time.wait(1000)
+            draw_board(SCREEN, board)
+            return player
+                        
+    # else, turn to the other player
+    else: return opposite
+
+# determine the winner according the score
+def get_winner(board):
+    if score["WHITE"] > score["BLACK"]:
+        display_text(SCREEN, "  WHITE WINS!  ")
+    elif score["BLACK"] > score["WHITE"]:
+        display_text(SCREEN, "  BLACK WINS!  ")
+    else:
+        display_text(SCREEN, "  IT'S A DRAW!  ")
+
+    # restart the game
+    restart()
+
+# determine the difficulty
+def difficulty_determine():
+    # global variable to change the difficulty
+    global FUTURE_MOVES
+
+    # 'easy' button
+    easy = FONT.render('EASY', True, GRAY)
+    easy_rect = easy.get_rect()
+    easy_rect.center = (240, 200)
+
+    # 'normal' button
+    normal = FONT.render('NORMAL', True, GRAY)
+    normal_rect = normal.get_rect()
+    normal_rect.center = (240, 240)
+
+    # 'hard' button
+    hard = FONT.render('HARD', True, GRAY)
+    hard_rect = hard.get_rect()
+    hard_rect.center = (240, 280)
+
+    # display the buttons
+    SCREEN.blit(easy, easy_rect)
+    SCREEN.blit(normal, normal_rect)
+    SCREEN.blit(hard, hard_rect)
+
+    # constantly check the events
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.display.quit()
+                exit()
+            # End if q is pressed
+            elif (event.type == pygame.KEYDOWN and
+                  (event.key == pygame.K_q or event.key == pygame.K_ESCAPE)):
+                pygame.display.quit()
+                exit()
+
+            # if click at button, get corresponding FUTURE_MOVES to determine 
+            # difficulty and get out the loop
+            if event.type == MOUSEBUTTONUP:
+                x,y = event.pos
+                if easy_rect.collidepoint((x,y)):
+                    FUTURE_MOVES = 1
+                    return
+                elif normal_rect.collidepoint((x,y)):
+                    FUTURE_MOVES = 3
+                    return
+                elif hard_rect.collidepoint((x,y)):
+                    FUTURE_MOVES = 4
+                    return
+
+        # update the board
+        pygame.display.update()
+
+# the main menu of the game including options about game mode and instructions
+def main_menu():
+    # display the instructions
+    instruct_string1 = "During a play, any disks of the opponent's color"
+    instruct_string2 = "that are in a straight line and bounded by the"
+    instruct_string3 = "disk just placed and another disk of the current"
+    instruct_string4 = "player's color are turned over to the current "
+    instruct_string5 = "player's color. White makes the first move."
+    instruct1 = FONT.render(instruct_string1, True, GRAY)
+    instruct1_rect = instruct1.get_rect()
+    instruct1_rect.center = (240, 50)
+    instruct2 = FONT.render(instruct_string2, True, GRAY)
+    instruct2_rect = instruct2.get_rect()
+    instruct2_rect.center = (240, 70)
+    instruct3 = FONT.render(instruct_string3, True, GRAY)
+    instruct3_rect = instruct3.get_rect()
+    instruct3_rect.center = (240, 90)
+    instruct4 = FONT.render(instruct_string4, True, GRAY)
+    instruct4_rect = instruct4.get_rect()
+    instruct4_rect.center = (240, 110)
+    instruct5 = FONT.render(instruct_string5, True, GRAY)
+    instruct5_rect = instruct5.get_rect()
+    instruct5_rect.center = (240, 130)
+    SCREEN.blit(instruct1, instruct1_rect)
+    SCREEN.blit(instruct2, instruct2_rect)
+    SCREEN.blit(instruct3, instruct3_rect)
+    SCREEN.blit(instruct4, instruct4_rect)
+    SCREEN.blit(instruct5, instruct5_rect)
+
+    # 'PLAYER vs COMPUTER' button
+    single = FONT.render('PLAYER vs COMPUTER', True, GRAY)
+    single_rect = single.get_rect()
+    single_rect.center = (240, 200)
+
+    # 'PLAYER vs PLAYER' button
+    double = FONT.render('PLAYER vs PLAYER', True, GRAY)
+    double_rect = double.get_rect()
+    double_rect.center = (240, 240)
+
+    # display the buttons
+    SCREEN.blit(single, single_rect)
+    SCREEN.blit(double, double_rect)
+    
+    # constantly checks the event
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.display.quit()
+                exit()
+            # End if q is pressed
+            elif (event.type == pygame.KEYDOWN and
+                  (event.key == pygame.K_q or event.key == pygame.K_ESCAPE)):
+                pygame.display.quit()
+                exit()
+            # choose the mode the player clicks at
+            if event.type == MOUSEBUTTONUP:
+                x,y = event.pos
+                if single_rect.collidepoint((x,y)):
+                    return "single"
+                elif double_rect.collidepoint((x,y)):
+                    return "double"
+
+        # update the screen
+        pygame.display.update()    
+
+# restart the game
+def restart():
+
+    # make the 'MAIN MENU' button
+    back = FONT.render("  MAIN MENU  ", True, BLACK)
+    back_rect = pygame.Rect((0, 0), back.get_size())
+    back_rect.center = (
+        to_screen_coord(BOARD_SIZE/2-0.5, BOARD_SIZE/2+1))
+    pygame.draw.rect(SCREEN, WHITE, back_rect)
+    pygame.draw.rect(SCREEN, BLACK, back_rect, 2)
+
+    # draw it
+    SCREEN.blit(back, back_rect)
+
+    # update the screen
+    pygame.display.update()
+
+    # constantly checks the event 
+    while(True):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.display.quit()
+                exit()
+            # End if q is pressed
+            elif (event.type == pygame.KEYDOWN and
+                  (event.key == pygame.K_q or event.key == pygame.K_ESCAPE)):
+                pygame.display.quit()
+                exit()
+            # if the button is clicked, reset score and rerun the game
+            elif event.type == pygame.MOUSEBUTTONUP:
+                x,y = event.pos
+                if back_rect.collidepoint((x,y)):
+                    score["WHITE"] = 2
+                    score["BLACK"] = 2
+                    run_game()
+
+run_game()

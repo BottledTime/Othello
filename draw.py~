@@ -1,0 +1,115 @@
+import pygame
+from pygame.locals import *
+from sys import exit
+import copy
+
+# defines the color we may use in game
+WHITE = (255, 255, 255)
+GRAY  = (127, 127, 127)
+BLACK = (  0,   0,   0)
+GREEN = (  0, 135,   0)
+
+# set the board
+TILE_SIZE = 50
+BOARD_SIZE = 8
+MARGIN = 40
+PIECE_RADIUS = 20
+
+# three status of a tile
+EMPTY_TILE  = "EMPTY"
+WHITE_PIECE = "WHITE"
+BLACK_PIECE = "BLACK"
+
+# Set the fonts
+pygame.font.init()
+FONT_SIZE = 20
+FONT = pygame.font.SysFont("Arial", FONT_SIZE)
+
+# reset the board as the start of the game
+def board_reset(board):
+    # fill the board with EMPTY_TILEs
+    for x in range(BOARD_SIZE):
+        for y in range(BOARD_SIZE):
+            board[x][y] = EMPTY_TILE
+
+    # add four pieces at the middle of the board
+    board[3][3] = WHITE_PIECE
+    board[3][4] = BLACK_PIECE
+    board[4][3] = BLACK_PIECE
+    board[4][4] = WHITE_PIECE
+
+# a test case
+def test_reset(board):
+    # fill the board with EMPTY_TILEs
+    for x in range(BOARD_SIZE):
+        for y in range(BOARD_SIZE):
+            board[x][y] = EMPTY_TILE
+
+    # put a certain pattern on the board to test
+    board[3][5] = BLACK_PIECE
+    board[3][6] = WHITE_PIECE
+    board[4][5] = WHITE_PIECE
+    board[3][4] = WHITE_PIECE
+    board[3][3] = BLACK_PIECE
+
+    # set the scores
+    score["WHITE"] = 3
+    score["BLACK"] = 2
+
+# convert the screen coord to board coord
+def to_board_coord(screen_x, screen_y):
+    board_x = int((screen_x - MARGIN) / TILE_SIZE)
+    board_y = int((screen_y - MARGIN) / TILE_SIZE)
+    return board_x, board_y
+
+# convert the board coord to screen coord
+def to_screen_coord(board_x, board_y):
+    screen_x = int((board_x+0.5) * TILE_SIZE + MARGIN)
+    screen_y = int((board_y+0.5) * TILE_SIZE + MARGIN)
+    return screen_x, screen_y
+
+# display text on screen
+def display_text(screen, string):
+    # Render the text
+    msg = FONT.render(string, True, BLACK)
+    
+    # Move it into position
+    msg_rect = pygame.Rect((0, 0), msg.get_size())
+    msg_rect.center = (
+        to_screen_coord(BOARD_SIZE/2-0.5, BOARD_SIZE/2-0.5))
+            
+    # Draw a background rectangle
+    pygame.draw.rect(screen, WHITE, msg_rect)
+    pygame.draw.rect(screen, BLACK, msg_rect, 2)
+
+    # Draw it
+    screen.blit(msg, msg_rect)
+    pygame.display.update()
+
+# draw the board according to the board array
+def draw_board(screen, board):
+    # set the background green
+    screen.fill(GREEN)
+
+    # draw the board
+    for x in range(BOARD_SIZE+1):
+        x1 = x * TILE_SIZE + MARGIN
+        y1 = MARGIN
+        x2 = x * TILE_SIZE + MARGIN
+        y2 = BOARD_SIZE * TILE_SIZE + MARGIN
+        pygame.draw.line(screen, BLACK, (x1, y1), (x2, y2))
+    for y in range(BOARD_SIZE+1):
+        x1 = MARGIN
+        y1 = y * TILE_SIZE + MARGIN 
+        x2 = BOARD_SIZE * TILE_SIZE + MARGIN
+        y2 = y * TILE_SIZE + MARGIN
+        pygame.draw.line(screen, BLACK, (x1, y1), (x2, y2))
+
+    # draw pieces on the board according to the board array
+    for x in range(BOARD_SIZE):
+        for y in range(BOARD_SIZE):
+            screen_x, screen_y = to_screen_coord(x,y)
+            if board[x][y] == WHITE_PIECE:
+                pygame.draw.circle(screen, WHITE, (screen_x, screen_y), PIECE_RADIUS)
+            if board[x][y] == BLACK_PIECE:
+                pygame.draw.circle(screen, BLACK, (screen_x, screen_y), PIECE_RADIUS)
